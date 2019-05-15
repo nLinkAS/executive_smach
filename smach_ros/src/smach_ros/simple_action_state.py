@@ -366,12 +366,17 @@ class SimpleActionState(State):
 
         # Check status
         if self._status == SimpleActionState.INACTIVE:
+            # If the state was requested preempted we have to obey it by calling
+            # self.service_preempt() regardless of the actual goal status to prevent
+            # this State from ending up in an unfornate situation where it would preempt
+            # immediately on the next run (See line 278). 
+            if self.preempt_requested():
+                outcome = 'preempted'
+                self.service_preempt()
+
             # Set the outcome on the result state
             if self._goal_status == GoalStatus.SUCCEEDED:
                 outcome = 'succeeded'
-            elif self._goal_status == GoalStatus.PREEMPTED and self.preempt_requested():
-                outcome = 'preempted'
-                self.service_preempt()
             else:
                 # All failures at this level are captured by aborting, even if we timed out
                 # This is an important distinction between local preemption, and preemption
