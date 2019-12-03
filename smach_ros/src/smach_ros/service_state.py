@@ -173,11 +173,23 @@ class ServiceState(smach.State):
 
         # Call service
         # Abandon hope, all ye who enter here
+        service_call_failed = False
         try:
             rospy.logdebug("Calling service %s with request:\n%s" % (self._service_name, str(self._request)))
             self._response = self._proxy(self._request)
         except rospy.ServiceException as ex:
             rospy.logerr("Exception when calling service '%s': %s" % (self._service_name, str(ex)))
+            service_call_failed = True
+
+        # If the state was requested preempted while service call was in progress we
+        # need to service it to prevent this State from ending up in an unfornate situation
+        # where it would preempt immediately on the next run (See line 111).
+        if self.preempt_requested():
+            rospy.loginfo("Preempting %s after receiving a response." % self._service_name)
+            self.service_preempt()
+            return 'preempted'
+
+        if service_call_failed:
             return 'aborted'
 
         # Call response callback if it's set
