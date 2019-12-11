@@ -310,6 +310,13 @@ class Concurrence(smach.container.Container):
         # Copy output keys
         self._copy_output_keys(self.userdata, parent_ud)
 
+        # Reset any preemption flags in case some of the states did not actually
+        # service the preemption correctly
+        for label in self._states:
+            if self._states[label].preempt_requested():
+                smach.logwarn("State '%s' did not service preempt call" % label)
+                self._states[label].recall_preempt()
+
         return outcome
 
     def request_preempt(self):
