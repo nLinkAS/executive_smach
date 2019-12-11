@@ -291,6 +291,16 @@ class StateMachine(smach.container.Container):
                 if not self._current_state.preempt_requested():
                     self.service_preempt()
 
+            # Reset any dangling preemption flags.
+            for label in self._states:
+                if self._states[label].preempt_requested():
+                    smach.logwarn("State '%s' did not service preemption." % label)
+                    self._states[label].recall_preempt()
+            
+            if self.preempt_requested():
+                smach.logwarn("StateMachine did not service preemption.")
+                self.service_preempt()
+
             if transition_target not in self.get_registered_outcomes():
                 # This is a container outcome that will fall through
                 transition_target = outcome
