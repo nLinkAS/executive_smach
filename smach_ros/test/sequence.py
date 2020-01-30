@@ -44,7 +44,7 @@ class Getter(State):
 class TestSequence(unittest.TestCase):
     def test_sequence(self):
         """Test adding a sequence of states."""
-        sq = Sequence(['succeeded','aborted','preempted','done'],connector_outcome='succeeded')
+        sq = Sequence(['succeeded','aborted','unreachable','preempted','done'],connector_outcome='succeeded')
         with sq:
             Sequence.add('FIRST', SimpleActionState('reference_action',TestAction, goal = g1))
             Sequence.add('SECOND', SimpleActionState('reference_action',TestAction, goal = g1))
