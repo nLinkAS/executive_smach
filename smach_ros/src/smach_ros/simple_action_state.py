@@ -116,7 +116,7 @@ class SimpleActionState(State):
         """
 
         # Initialize base class
-        State.__init__(self, outcomes=['succeeded','aborted','preempted'])
+        State.__init__(self, outcomes=['succeeded','aborted','preempted','unreachable'])
 
         # Set action properties
         self._action_name = action_name
@@ -209,12 +209,10 @@ class SimpleActionState(State):
         self._activate_time = rospy.Time.now()
         self._preempt_time = rospy.Time.now()
         self._duration = rospy.Duration(0.0)
-        self._status = SimpleActionState.WAITING_FOR_SERVER
+        self._status = SimpleActionState.INACTIVE
 
         # Construct action client, and wait for it to come active
         self._action_client = SimpleActionClient(action_name, action_spec)
-        self._action_wait_thread = threading.Thread(name=self._action_name+'/wait_for_server', target=self._wait_for_server)
-        self._action_wait_thread.start()
 
         self._execution_timer_thread = None
 
@@ -222,20 +220,22 @@ class SimpleActionState(State):
         self._done_cond = threading.Condition()
 
     def _wait_for_server(self):
-        """Internal method for waiting for the action server
-        This is run in a separate thread and allows construction of this state
-        to not block the construction of other states.
-        """        
+        """Internal method for waiting for the action server"""
+
         timeout_time = rospy.get_rostime() + self._server_wait_timeout
-        while self._status == SimpleActionState.WAITING_FOR_SERVER and not rospy.is_shutdown() and not rospy.get_rostime() >= timeout_time:
+        while not rospy.is_shutdown() and not rospy.get_rostime() >= timeout_time:
             try:
-                if self._action_client.wait_for_server(rospy.Duration(1.0)):#self._server_wait_timeout):
-                    self._status = SimpleActionState.INACTIVE
+                if self._action_client.wait_for_server(rospy.Duration(1.0)):
+                    return True
+
                 if self.preempt_requested():
-                    return
+                    return False
             except:
                 if not rospy.core._in_shutdown: # This is a hack, wait_for_server should not throw an exception just because shutdown was called
                     rospy.logerr("Failed to wait for action server '%s'" % (self._action_name))
+
+        # ROS shutdown or timeout exceeded. Fail
+        return False
 
     def _execution_timer(self):
         """Internal method for cancelling a timed out goal after a timeout."""
@@ -265,32 +265,26 @@ class SimpleActionState(State):
         goal with a non-blocking call to the action client.
         """
 
-        # Make sure we're connected to the action server
-        if self._status is SimpleActionState.WAITING_FOR_SERVER:
-            rospy.logwarn("Still waiting for action server '%s' to start... is it running?" % self._action_name)
-            if self._action_wait_thread.is_alive():
-                # Block on joining the server wait thread (This can be preempted)
-                self._action_wait_thread.join()
-            else:
-                # Wait for the server in this thread (This can also be preempted)
-                self._wait_for_server()
+        self._status = SimpleActionState.WAITING_FOR_SERVER
 
-            if not self.preempt_requested():
-                # In case of preemption we probably didn't connect
-                rospy.loginfo("Connected to action server '%s'." % self._action_name)
+        # Wait for server
+        if not self._wait_for_server():
+            if self.preempt_requested():
+                rospy.loginfo("Preempting %s while waiting for server." % self._action_name)
+                self.service_preempt()
+                return 'preempted'
+
+            rospy.logfatal("Action server for "+self._action_name+" is not running.")
+            return 'unreachable'
+
+        # We did connect to server. Change status to INACTIVE
+        self._status = SimpleActionState.INACTIVE
 
         # Check for preemption before executing
         if self.preempt_requested():
             rospy.loginfo("Preempting %s before sending goal." % self._action_name)
             self.service_preempt()
             return 'preempted'
-
-        # We should only get here if we have connected to the server
-        if self._status is SimpleActionState.WAITING_FOR_SERVER:
-            rospy.logfatal("Action server for "+self._action_name+" is not running.")
-            return 'aborted'
-        else:
-            self._status = SimpleActionState.INACTIVE
 
         # Grab goal key, if set
         if self._goal_key is not None:

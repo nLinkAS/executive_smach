@@ -119,7 +119,7 @@ class TestStateMachine(unittest.TestCase):
 
     def test_sequence(self):
         """Test adding a sequence of states."""
-        sm = StateMachine(['succeeded','aborted','preempted','done'])
+        sm = StateMachine(['succeeded','aborted','unreachable','preempted','done'])
         with sm:
             StateMachine.add_auto('FIRST', SimpleActionState('reference_action',TestAction, goal = g1),['succeeded'])
             StateMachine.add_auto('SECOND', SimpleActionState('reference_action',TestAction, goal = g1),['succeeded'])
@@ -140,7 +140,7 @@ class TestStateMachine(unittest.TestCase):
         sm = StateMachine(['succeeded','done'])
         with sm:
             StateMachine.add('FAILSAUCE',DoneState())
-            transitions = {'aborted':'FAILSAUCE','preempted':'FAILSAUCE'}
+            transitions = {'aborted':'FAILSAUCE','unreachable':'FAILSAUCE','preempted':'FAILSAUCE'}
             with sm:
                 StateMachine.add('FIRST', SimpleActionState('reference_action',TestAction, goal = g1), transitions)
                 StateMachine.add('SECOND', SimpleActionState('reference_action',TestAction, goal = g2), transitions)
@@ -152,7 +152,7 @@ class TestStateMachine(unittest.TestCase):
     def test_alt_api(self):
         """Test adding with alt apis."""
 
-        sm = StateMachine(['succeeded','aborted','preempted'])
+        sm = StateMachine(['succeeded','aborted','unreachable','preempted'])
         with sm.opened():
             sm.add('FIRST', SimpleActionState('reference_action',TestAction, goal = g1),{})
             sm.add('SECOND', SimpleActionState('reference_action',TestAction, goal = g2),{})
