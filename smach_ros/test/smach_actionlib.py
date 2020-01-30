@@ -38,7 +38,7 @@ class AssertUDState(State):
 class TestActionlib(unittest.TestCase):
     def test_action_client(self):
         """Test simple action states"""
-        sq = Sequence(['succeeded', 'aborted', 'preempted', 'foobar'], 'succeeded')
+        sq = Sequence(['succeeded', 'aborted', 'unreachable', 'preempted', 'foobar'], 'succeeded')
 
         sq.userdata['g1'] = g1
         sq.userdata['g2'] = g2
@@ -161,7 +161,7 @@ class TestActionlib(unittest.TestCase):
 
     def test_action_server_wrapper(self):
         """Test action server wrapper."""
-        sq = Sequence(['succeeded', 'aborted', 'preempted'], 'succeeded')
+        sq = Sequence(['succeeded', 'aborted', 'unreachable', 'preempted'], 'succeeded')
         sq.register_input_keys(['goal', 'action_goal', 'action_result'])
         sq.register_output_keys(['action_result'])
 
@@ -186,7 +186,7 @@ class TestActionlib(unittest.TestCase):
         asw = ActionServerWrapper(
                 'reference_action_sm', TestAction, sq,
                 succeeded_outcomes=['succeeded'],
-                aborted_outcomes=['aborted'],
+                aborted_outcomes=['aborted', 'unreachable'],
                 preempted_outcomes=['preempted'],
                 expand_goal_slots=True)
         asw.run_server()
