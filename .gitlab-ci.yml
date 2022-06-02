@@ -1,0 +1,24 @@
+default:
+  image: ros:kinetic-ros-base
+  tags:
+    - bu-mea-robotics
+build:
+  stage: test
+  script:
+    # Install system dependencies / tooling
+    - apt-get update
+    # Create workspace
+    - mkdir -p /catkin_ws/src
+    # Move code into this repository
+    - mv /builds/$CI_PROJECT_PATH /catkin_ws/src/
+    # Move to workspace
+    - cd /catkin_ws
+    - rosdep install --from-paths src --ignore-src --rosdistro kinetic -y
+    # Build package
+    - source /opt/ros/kinetic/setup.bash
+    - catkin_make
+    # Run tests
+    - source /opt/ros/kinetic/setup.bash
+    - catkin_make run_tests
+    # Check test results to get a non-zero exit code of failures
+    - catkin_test_results
