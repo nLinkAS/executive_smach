@@ -33,9 +33,21 @@ class ServiceState(smach.State):
             input_keys = [],
             output_keys = [],
             outcomes = [],
+            # Timeouts
+            server_wait_timeout = None
             ):
+        
+        """
+        @type server_wait_timeout: C{rospy.Duration}
+        @param server_wait_timeout: This is the timeout used for aborting while
+        waiting for a server to become active. This is C{None} by default,
+        which implies no timeout. Setting duration > 0 adds outcome 'unreachable'
+        """
 
-        smach.State.__init__(self,outcomes=['succeeded','aborted','preempted'])
+        if server_wait_timeout:
+            smach.State.__init__(self,outcomes=['succeeded','aborted','preempted','unreachable'])
+        else:
+            smach.State.__init__(self,outcomes=['succeeded','aborted','preempted'])
 
         # Store Service info
         self._service_name = service_name
@@ -105,6 +117,9 @@ class ServiceState(smach.State):
         self._response_slots = response_slots
         self.register_output_keys(response_slots)
 
+        # Store timeout
+        self._server_wait_timeout = server_wait_timeout
+
     def execute(self, ud):
         """Execute service"""
         # Check for preemption before executing
@@ -115,7 +130,10 @@ class ServiceState(smach.State):
 
         # Make sure we're connected to the service
         try:
-            while self._proxy is None:
+            if self._server_wait_timeout:
+                timeout_time = rospy.Time.now() + self._server_wait_timeout
+
+            while self._proxy is None and (self._server_wait_timeout is None or rospy.Time.now() < timeout_time):
                 if self.preempt_requested():
                     rospy.loginfo("Preempting while waiting for service '%s'." % self._service_name)
                     self.service_preempt()
@@ -129,6 +147,10 @@ class ServiceState(smach.State):
                     rospy.logdebug("Connected to service '%s'" % self._service_name)
                 except rospy.ROSException as ex:
                     rospy.logwarn("Still waiting for service '%s'..." % self._service_name)
+
+            if self._server_wait_timeout and rospy.Time.now() >= timeout_time:
+                rospy.logwarn("Timed out waiting for service '%s'..." % self._service_name)
+                return 'unreachable'
         except:
             rospy.logwarn("Terminated while waiting for service '%s'." % self._service_name)
             return 'aborted'
