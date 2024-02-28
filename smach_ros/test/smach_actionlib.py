@@ -238,7 +238,7 @@ class TestActionlib(unittest.TestCase):
 
     def test_action_client_timeout(self):
         """Test simple action state server timeout"""
-        sq = Sequence(['succeeded', 'aborted', 'preempted'], 'succeeded')
+        sq = Sequence(['succeeded', 'aborted', 'preempted', 'unreachable'], 'succeeded')
 
         sq.userdata['g1'] = g1
 
